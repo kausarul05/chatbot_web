@@ -21,21 +21,14 @@ export default function Sidebar() {
     const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(null);
 
     const menuItems = [
-        { href: "/admin", icon: "a", label: "Dashboards" },
-        { href: "/admin/user-management", icon: History, label: "User Management" },
-        {
-            href: "#",
-            icon: "b",
-            label: "Subscriptions Management",
-            hasNested: true,
-            nestedItems: [
-                { href: "/admin/subscriptions/plans", label: "Plans" },
-                { href: "/admin/subscriptions/subscribers", label: "Subscribers" }
-            ]
-        },
-        { href: "/admin/products-management", icon: "C", label: "Products Management" },
-        { href: "/admin/review-management", icon: "D", label: "Review Management" },
-        { href: "/admin/settings", icon: "K", label: "Settings" },
+        { href: "/dashboard", icon: "a", label: "Dashboards" },
+        { href: "/dashboard/live-chat-integration", icon: "a", label: "Live Integration" },
+        { href: "/dashboard/live-chat", icon: "a", label: "Live Chat" },
+        // { href: "/admin/user-management", icon: History, label: "User Management" },
+        
+        // { href: "/admin/products-management", icon: "C", label: "Products Management" },
+        // { href: "/admin/review-management", icon: "D", label: "Review Management" },
+        // { href: "/admin/settings", icon: "K", label: "Settings" },
     ];
 
     // Auto-open menu if current page is a nested item
@@ -66,7 +59,7 @@ export default function Sidebar() {
     };
 
     return (
-        <div className="w-[385px] bg-[#0D314B] h-screen text-white py-14 pt-4 px-10 fixed z-50">
+        <div className="w-[150px] bg-[#0D314B] h-screen text-white fixed z-50">
             <div>
                 <Link href="/">
                     {/* <Image
