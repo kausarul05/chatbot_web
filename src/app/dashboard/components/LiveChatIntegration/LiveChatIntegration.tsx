@@ -8,9 +8,9 @@ type IframePageProps = {
   title?: string;
 };
 
-export default function IframePage({ 
-  url = "https://dashboard.chatbot24.ai/settings/live-chat-integrations", 
-  title = "Chatbot Dashboard" 
+export default function IframePage({
+  url = "https://dashboard.chatbot24.ai/settings/live-chat-integrations",
+  title = "Chatbot Dashboard"
 }: IframePageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -23,6 +23,27 @@ export default function IframePage({
       router.push("/login");
     }
   }, [router]);
+
+  // In your IframePage component, add:
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const token = localStorage.getItem("externalAuthToken");
+    const iframe = document.getElementById("external-site-iframe") as HTMLIFrameElement;
+
+    if (iframe && token) {
+      // Send token to iframe once it's loaded
+      const handleLoad = () => {
+        iframe.contentWindow?.postMessage({
+          type: 'AUTH_TOKEN',
+          token: token
+        }, '*');
+      };
+
+      iframe.addEventListener('load', handleLoad);
+      return () => iframe.removeEventListener('load', handleLoad);
+    }
+  }, []);
 
   const handleIframeLoad = () => {
     setIsLoading(false);
@@ -63,7 +84,7 @@ export default function IframePage({
             </button>
             {/* <h1 className="text-xl font-bold text-white">{title}</h1> */}
           </div>
-          
+
           <div className="flex items-center gap-3">
             <button
               onClick={handleRefresh}
@@ -131,6 +152,7 @@ export default function IframePage({
       {/* Iframe */}
       {!hasError && (
         <div className={`w-full ${isLoading ? 'h-0' : 'h-screen'}`}>
+          {/* // Set credentials on iframe */}
           <iframe
             id="external-site-iframe"
             src={url}
@@ -140,6 +162,7 @@ export default function IframePage({
             title={title}
             allow="camera; microphone; fullscreen; clipboard-write"
             allowFullScreen
+            credential="include" // Add this
           />
         </div>
       )}

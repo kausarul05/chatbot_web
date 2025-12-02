@@ -44,7 +44,7 @@ const generateDeviceId = () => {
     let deviceId = localStorage.getItem('deviceId');
     if (!deviceId) {
       // Generate new device ID if not exists
-      deviceId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      deviceId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
         const r = Math.random() * 16 | 0;
         const v = c == 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
@@ -124,37 +124,8 @@ export default function LoginPage() {
     setError("");
 
     try {
-      // Get device information
-      const deviceInfo = getDeviceInfo();
-      const timezone = getTimezone();
-
-      // Step 1: Login to external API first with correct payload structure
-      console.log("Logging into external API...");
-      const externalResponse = await fetch("https://api.chatbot24.ai/v1/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          device: deviceInfo,
-          password: formData.password,
-          timezone: timezone,
-          username: formData.email,
-        }),
-      });
-
-      const externalData: ExternalLoginResponse | ErrorResponse = await externalResponse.json();
-
-      console.log("External API response:", externalData);
-
-      if (!externalResponse.ok) {
-        // Handle external API error
-        throw new Error(externalData.error || "External authentication failed. Please try again.");
-      }
-
-      console.log("External login successful, proceeding to local login...");
-
-      // Step 2: If external login successful, login to our local system
+      // **ONLY login to our local system**
+      console.log("Logging into local system...");
       const localResponse = await fetch("http://localhost:5000/api/auth/login", {
         method: "POST",
         headers: {
@@ -166,45 +137,24 @@ export default function LoginPage() {
         }),
       });
 
-      const localData: LocalLoginResponse | ErrorResponse = await localResponse.json();
+      const localData = await localResponse.json();
 
       if (!localResponse.ok) {
-        // Handle local API error
-        throw new Error(localData.error || "Local authentication failed. Please try again.");
+        throw new Error(localData.error || "Login failed");
       }
 
-      // Handle successful login for both systems
-      const localLoginData = localData as LocalLoginResponse;
-      
-      // Store token and user data from local system
-      localStorage.setItem("authToken", localLoginData.token);
-      localStorage.setItem("userData", JSON.stringify(localLoginData.user));
-      
-      // Also store external token if needed for future API calls
-      const externalLoginData = externalData as ExternalLoginResponse;
-      localStorage.setItem("externalAuthToken", externalLoginData.accessToken);
-      
-      if (formData.rememberMe) {
-        localStorage.setItem("rememberMe", "true");
-      }
+      // **Store credentials for later chatbot24.ai login**
+      localStorage.setItem("authToken", localData.token);
+      localStorage.setItem("userData", JSON.stringify(localData.user));
+      localStorage.setItem("externalUserEmail", formData.email);
+      localStorage.setItem("externalUserPassword", formData.password); // Store password for chatbot login
 
-      console.log("Both external and local login successful!");
-      
-      // Redirect to dashboard
+      console.log("Local login successful!");
       router.push("/dashboard");
 
-    } catch (err: any) {
-      // Handle different types of errors
-      if (err.name === 'TypeError' && err.message.includes('Failed to fetch')) {
-        if (err.message.includes('api.chatbot24.ai')) {
-          setError("Unable to connect to authentication service. Please try again later.");
-        } else {
-          setError("Unable to connect to server. Please check if the server is running.");
-        }
-      } else {
-        setError(err.message || "Something went wrong. Please try again.");
-      }
+    } catch (err) {
       console.error("Login error:", err);
+      setError(err.message || "Login failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
