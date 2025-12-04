@@ -93,24 +93,26 @@ export default function RegisterPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-        //   firstName: formData.firstName,
-        //   lastName: formData.lastName,
-          name : formData.firstName + " " + formData.lastName,
+          //   firstName: formData.firstName,
+          //   lastName: formData.lastName,
+          name: formData.firstName + " " + formData.lastName,
           email: formData.email,
           password: formData.password,
         }),
       });
 
       const data: RegisterResponse | ErrorResponse = await response.json();
-
+      
       if (!response.ok) {
         // Handle API error
-        throw new Error(data.error || "Registration failed. Please try again.");
+        const errorData = data as ErrorResponse;
+        throw new Error(errorData.error || "Registration failed. Please try again.");
       }
+
 
       // Handle successful registration
       const registerData = data as RegisterResponse;
-      
+
       // Store token and user data
       localStorage.setItem("authToken", registerData.token);
       localStorage.setItem("userData", JSON.stringify(registerData.user));

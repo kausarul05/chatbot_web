@@ -1,46 +1,14 @@
-// components/AnychatClient.tsx (Updated)
+// components/AnychatClient.tsx
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
 import { useAnychatDirectWebSocket } from '@/app/hooks/useAnychatDirectWebSocket';
 import ConversationList from '../ConversationList/ConversationList';
-// import ConversationList from './ConversationList';
 
-interface Thread {
-  guid: string;
-  thread: string;
-  client: {
-    guid: string;
-    name: string;
-    email: string;
-    data: {
-      phoneNumber?: string;
-    };
-  };
-  lastMessage: {
-    id: string;
-    content: string;
-    timestamp: number;
-    from_guid: string;
-  };
-  unreadCount: number;
-  unread: boolean;
-  status: number;
-  assigned_to: string | null;
-  assignedTo?: any;
-  botDriven: boolean;
-  is_archive: number;
-  widget_uid: string;
-  integration_id?: string;
-  tags: Array<{
-    label: string;
-    color?: string;
-  }>;
-}
 
 export default function AnychatClient() {
   const [activeTab, setActiveTab] = useState<'active' | 'bot-driven' | 'archive'>('active');
-  const [selectedThread, setSelectedThread] = useState<Thread | null>(null);
+  const [selectedThread, setSelectedThread] = useState<any>(null);
   const [messageInput, setMessageInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -48,6 +16,7 @@ export default function AnychatClient() {
     isConnected,
     connectionStatus,
     messages,
+    threads,
     onlineUsers,
     currentRoom,
     error,
@@ -56,7 +25,8 @@ export default function AnychatClient() {
     leaveRoom,
     connect,
     disconnect,
-    clearError
+    clearError,
+    refreshThreads
   } = useAnychatDirectWebSocket();
 
   // Auto-scroll to bottom when new messages arrive
@@ -64,14 +34,24 @@ export default function AnychatClient() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSelectConversation = (thread: Thread) => {
+  const handleSelectConversation = (thread: any) => {
     setSelectedThread(thread);
+    
+    // Leave previous room if exists
+    if (currentRoom && currentRoom !== thread.guid) {
+      leaveRoom(currentRoom);
+    }
+    
     // Join the thread room
     joinRoom(thread.guid);
   };
 
   const handleSendMessage = () => {
-    if (!messageInput.trim() || !selectedThread) return;
+    if (!messageInput.trim() || !currentRoom) {
+      console.warn('Cannot send message: No room selected or empty message');
+      return;
+    }
+    
     sendMessage(messageInput);
     setMessageInput('');
   };
@@ -84,8 +64,7 @@ export default function AnychatClient() {
   };
 
   const handleRetryConnection = () => {
-    const token = localStorage.getItem('authToken') || localStorage.getItem('externalAccessToken');
-    connect(token || undefined);
+    connect();
   };
 
   const getStatusColor = () => {
@@ -118,10 +97,12 @@ export default function AnychatClient() {
     <div className="min-h-screen bg-gradient-to-br from-[#0A0F1C] to-[#1e2a47] flex">
       {/* Conversation List Sidebar */}
       <ConversationList
+        threads={threads}
         onSelectConversation={handleSelectConversation}
         currentConversation={selectedThread}
         activeTab={activeTab}
         onTabChange={setActiveTab}
+        onRefresh={refreshThreads}
       />
 
       {/* Main Chat Area */}
@@ -139,7 +120,12 @@ export default function AnychatClient() {
                 <span>👥 {onlineUsers} online</span>
                 {selectedThread && (
                   <span className="bg-[#536dfe] px-2 py-1 rounded text-white">
-                    {selectedThread.client.name}
+                    {selectedThread.client?.name || 'Unknown User'}
+                  </span>
+                )}
+                {selectedThread && selectedThread.integration_id && (
+                  <span className="text-xs bg-gray-700 px-2 py-1 rounded">
+                    {selectedThread.integration_id}
                   </span>
                 )}
               </div>
@@ -181,7 +167,7 @@ export default function AnychatClient() {
           <div className="h-full flex flex-col">
             {/* Messages List */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {!selectedThread ? (
+              {!currentRoom ? (
                 <div className="text-center text-gray-500 py-8">
                   <div className="w-16 h-16 mx-auto mb-4 bg-[#2D3748] rounded-full flex items-center justify-center">
                     <span className="text-2xl">💬</span>
@@ -198,42 +184,44 @@ export default function AnychatClient() {
                   <p className="text-sm mt-2">Start the conversation!</p>
                 </div>
               ) : (
-                messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
+                messages
+                  .filter(msg => msg.roomId === currentRoom)
+                  .map((message) => (
                     <div
-                      className={`max-w-xs lg:max-w-md rounded-2xl p-4 ${
-                        message.sender === 'user'
-                          ? 'bg-[#536dfe] text-white rounded-br-none'
-                          : message.sender === 'agent'
-                          ? 'bg-[#2D3748] text-white rounded-bl-none'
-                          : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
-                      }`}
+                      key={message.id}
+                      className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
-                      {message.sender === 'system' && (
-                        <div className="text-xs font-medium mb-1">System</div>
-                      )}
-                      
-                      <div className="text-sm whitespace-pre-wrap">
-                        {message.content}
-                      </div>
-                      
-                      <div className={`text-xs mt-2 ${
-                        message.sender === 'user' ? 'text-blue-100' : 'text-gray-400'
-                      }`}>
-                        {formatTime(message.timestamp)}
+                      <div
+                        className={`max-w-xs lg:max-w-md rounded-2xl p-4 ${
+                          message.sender === 'user'
+                            ? 'bg-[#536dfe] text-white rounded-br-none'
+                            : message.sender === 'agent'
+                            ? 'bg-[#2D3748] text-white rounded-bl-none'
+                            : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
+                        }`}
+                      >
+                        {message.sender === 'system' && (
+                          <div className="text-xs font-medium mb-1">System</div>
+                        )}
+                        
+                        <div className="text-sm whitespace-pre-wrap">
+                          {message.content}
+                        </div>
+                        
+                        <div className={`text-xs mt-2 ${
+                          message.sender === 'user' ? 'text-blue-100' : 'text-gray-400'
+                        }`}>
+                          {formatTime(message.timestamp)}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  ))
               )}
               <div ref={messagesEndRef} />
             </div>
 
             {/* Message Input */}
-            {selectedThread && (
+            {currentRoom && (
               <div className="border-t border-[#2D3748] p-4">
                 <div className="flex gap-2">
                   <textarea

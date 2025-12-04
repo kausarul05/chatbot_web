@@ -162,7 +162,7 @@ export default function IframePage({
             title={title}
             allow="camera; microphone; fullscreen; clipboard-write"
             allowFullScreen
-            credential="include" // Add this
+            // credential="include" // Add this
           />
         </div>
       )}

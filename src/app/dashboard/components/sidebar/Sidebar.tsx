@@ -32,31 +32,16 @@ export default function Sidebar() {
     ];
 
     // Auto-open menu if current page is a nested item
-    useEffect(() => {
-        const subscriptionsItem = menuItems.find(item => item.hasNested);
-        if (subscriptionsItem?.nestedItems?.some(nested => pathname === nested.href)) {
-            setIsSubscriptionsOpen(true);
-        }
-    }, [pathname, menuItems]);
+    // useEffect(() => {
+    //     const subscriptionsItem = menuItems.find(item => item.hasNested);
+    //     if (subscriptionsItem?.nestedItems?.some(nested => pathname === nested.href)) {
+    //         setIsSubscriptionsOpen(true);
+    //     }
+    // }, [pathname, menuItems]);
 
-    const handleMouseEnter = () => {
-        if (hoverTimeout) {
-            clearTimeout(hoverTimeout);
-        }
-        setIsSubscriptionsOpen(true);
-    };
+    
 
-    const handleMouseLeave = () => {
-        const timeout = setTimeout(() => {
-            const subscriptionsItem = menuItems.find(item => item.hasNested);
-            const isOnNestedItem = subscriptionsItem?.nestedItems?.some(nested => pathname === nested.href);
-
-            if (!isOnNestedItem) {
-                setIsSubscriptionsOpen(false);
-            }
-        }, 300);
-        setHoverTimeout(timeout);
-    };
+    
 
     return (
         <div className="w-[150px] bg-[#0D314B] h-screen text-white fixed z-50">

@@ -3,181 +3,56 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
-interface Thread {
-  guid: string;
-  thread: string;
-  client: {
-    guid: string;
-    name: string;
-    email: string;
-    data: {
-      phoneNumber?: string;
-    };
-  };
-  lastMessage: {
-    id: string;
-    content: string;
-    timestamp: number;
-    from_guid: string;
-    last_edit?: number;
-    is_service?: number;
-  };
-  unreadCount: number;
-  unread: boolean;
-  status: number; // 1=open, 2=resolved
-  assigned_to: string | null;
-  assignedTo?: {
-    guid: string;
-    firstname: string;
-    lastname: string;
-    email: string;
-    image?: string;
-  };
-  botDriven: boolean;
-  is_archive: number;
-  widget_uid: string;
-  integration_id?: string;
-  tags: Array<{
-    id?: string;
-    label: string;
-    color?: string;
-  }>;
-  operators?: Array<any>;
-  lastMessageDate?: string;
-}
-
+// Remove the sampleThreads and update the component to use real data
 interface ConversationListProps {
-  onSelectConversation: (thread: Thread) => void;
-  currentConversation?: Thread | null;
+  threads: any[];
+  onSelectConversation: (thread: any) => void;
+  currentConversation?: any | null;
   activeTab: 'active' | 'bot-driven' | 'archive';
   onTabChange: (tab: 'active' | 'bot-driven' | 'archive') => void;
+  onRefresh?: () => void;
+  refreshing?: boolean;
 }
 
 export default function ConversationList({ 
+  threads = [],
   onSelectConversation, 
   currentConversation,
   activeTab,
-  onTabChange
+  onTabChange,
+  onRefresh,
+  refreshing = false
 }: ConversationListProps) {
-  const [threads, setThreads] = useState<Thread[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [filteredThreads, setFilteredThreads] = useState(threads);
 
-  // Sample data based on your React Native structure
-  const sampleThreads: Thread[] = [
-    {
-      guid: 'thread-1',
-      thread: 'thread-1',
-      client: {
-        guid: 'client-1',
-        name: 'John Doe',
-        email: 'john@example.com',
-        data: { phoneNumber: '+1234567890' }
-      },
-      lastMessage: {
-        id: 'msg-1',
-        content: 'Hello, I need help with my order',
-        timestamp: Date.now() - 300000,
-        from_guid: 'client-1'
-      },
-      unreadCount: 2,
-      unread: true,
-      status: 1,
-      assigned_to: null,
-      botDriven: false,
-      is_archive: 0,
-      widget_uid: 'widget-1',
-      integration_id: 'web-chat',
-      tags: [
-        { label: 'Urgent', color: '#FF6B6B' },
-        { label: 'Billing', color: '#4ECDC4' }
-      ]
-    },
-    {
-      guid: 'thread-2',
-      thread: 'thread-2',
-      client: {
-        guid: 'client-2',
-        name: 'Sarah Smith',
-        email: 'sarah@example.com',
-        data: { phoneNumber: '+0987654321' }
-      },
-      lastMessage: {
-        id: 'msg-2',
-        content: 'Thank you for your help!',
-        timestamp: Date.now() - 600000,
-        from_guid: 'agent-1'
-      },
-      unreadCount: 0,
-      unread: false,
-      status: 1,
-      assigned_to: 'agent-1',
-      assignedTo: {
-        guid: 'agent-1',
-        firstname: 'Mike',
-        lastname: 'Johnson',
-        email: 'mike@company.com'
-      },
-      botDriven: false,
-      is_archive: 0,
-      widget_uid: 'widget-1',
-      integration_id: 'whatsapp',
-      tags: [
-        { label: 'Resolved', color: '#51CF66' }
-      ]
-    },
-    {
-      guid: 'thread-3',
-      thread: 'thread-3',
-      client: {
-        guid: 'client-3',
-        name: 'AI Customer',
-        email: 'ai@example.com',
-        data: {}
-      },
-      lastMessage: {
-        id: 'msg-3',
-        content: 'How can I reset my password?',
-        timestamp: Date.now() - 120000,
-        from_guid: 'client-3'
-      },
-      unreadCount: 1,
-      unread: true,
-      status: 1,
-      assigned_to: null,
-      botDriven: true,
-      is_archive: 0,
-      widget_uid: 'widget-2',
-      integration_id: 'web-chat',
-      tags: [
-        { label: 'AI', color: '#9C27B0' }
-      ]
-    }
-  ];
-
-  // Simulate loading threads
+  // Update filtered threads when threads or activeTab changes
   useEffect(() => {
-    const loadThreads = async () => {
-      setLoading(true);
-      // Simulate API call
-      setTimeout(() => {
-        setThreads(sampleThreads);
-        setLoading(false);
-      }, 1000);
-    };
-
-    loadThreads();
-  }, []);
-
-  const handleRefresh = useCallback(() => {
-    setRefreshing(true);
-    // Simulate refresh
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 1000);
-  }, []);
+    const filtered = threads.filter(thread => {
+      if (activeTab === 'active') {
+        return !thread.botDriven && thread.is_archive === 0;
+      }
+      if (activeTab === 'bot-driven') {
+        return thread.botDriven && thread.is_archive === 0;
+      }
+      if (activeTab === 'archive') {
+        return thread.is_archive === 1;
+      }
+      return true;
+    });
+    
+    // Sort by last message timestamp (newest first)
+    filtered.sort((a, b) => {
+      const timeA = a.lastMessage?.timestamp || 0;
+      const timeB = b.lastMessage?.timestamp || 0;
+      return timeB - timeA;
+    });
+    
+    setFilteredThreads(filtered);
+  }, [threads, activeTab]);
 
   const formatTime = (timestamp: number) => {
+    if (!timestamp) return 'Just now';
+    
     const now = Date.now();
     const diff = now - timestamp;
     
@@ -185,7 +60,10 @@ export default function ConversationList({
     if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
     if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
     
-    return new Date(timestamp).toLocaleDateString();
+    return new Date(timestamp).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    });
   };
 
   const getChannelIcon = (integrationId?: string) => {
@@ -207,43 +85,34 @@ export default function ConversationList({
     }
   };
 
-  const filteredThreads = threads.filter(thread => {
-    if (activeTab === 'active') {
-      return !thread.botDriven && thread.is_archive === 0;
+  const handleRefresh = () => {
+    if (onRefresh) {
+      onRefresh();
     }
-    if (activeTab === 'bot-driven') {
-      return thread.botDriven && thread.is_archive === 0;
-    }
-    if (activeTab === 'archive') {
-      return thread.is_archive === 1;
-    }
-    return true;
-  });
-
-  if (loading) {
-    return (
-      <div className="w-80 bg-[#1A2028] border-r border-[#2D3748] h-full flex flex-col">
-        <div className="p-4 border-b border-[#2D3748]">
-          <h2 className="text-lg font-semibold text-white">Conversations</h2>
-        </div>
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <svg className="animate-spin h-8 w-8 text-[#60A5FB] mx-auto mb-2" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-            <p className="text-gray-400">Loading conversations...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  };
 
   return (
     <div className="w-80 bg-[#1A2028] border-r border-[#2D3748] h-full flex flex-col">
       {/* Header */}
       <div className="p-4 border-b border-[#2D3748]">
-        <h2 className="text-lg font-semibold text-white mb-3">Conversations</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold text-white">Conversations</h2>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="text-gray-400 hover:text-white p-1 rounded hover:bg-[#2D3748] disabled:opacity-50"
+            title="Refresh conversations"
+          >
+            <svg 
+              className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+        </div>
         
         {/* Tabs */}
         <div className="flex space-x-1 bg-[#0F172A] rounded-lg p-1">
@@ -274,6 +143,7 @@ export default function ConversationList({
                 <span className="text-2xl">💬</span>
               </div>
               <p>No conversations in {activeTab}</p>
+              <p className="text-sm mt-2">New conversations will appear here</p>
             </div>
           </div>
         ) : (
@@ -290,22 +160,22 @@ export default function ConversationList({
               >
                 {/* Header */}
                 <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2 flex-1 min-w-0">
                     <span className="text-sm">
                       {getChannelIcon(thread.integration_id)}
                     </span>
                     <span className={`w-2 h-2 rounded-full ${getStatusColor(thread.status)}`}></span>
-                    <span className="font-medium text-sm truncate max-w-24">
-                      {thread.client.name || 'Unknown User'}
+                    <span className="font-medium text-sm truncate">
+                      {thread.client?.name || 'Unknown User'}
                     </span>
                   </div>
                   
-                  <div className="flex items-center space-x-1">
-                    <span className="text-xs opacity-75">
-                      {formatTime(thread.lastMessage.timestamp)}
+                  <div className="flex items-center space-x-1 flex-shrink-0">
+                    <span className="text-xs opacity-75 whitespace-nowrap">
+                      {formatTime(thread.lastMessage?.timestamp)}
                     </span>
                     {thread.unreadCount > 0 && (
-                      <span className={`px-1.5 py-0.5 rounded-full text-xs font-medium ${
+                      <span className={`px-1.5 py-0.5 rounded-full text-xs font-medium min-w-5 text-center ${
                         currentConversation?.guid === thread.guid
                           ? 'bg-white text-[#536dfe]'
                           : 'bg-[#536dfe] text-white'
@@ -320,26 +190,26 @@ export default function ConversationList({
                 <p className={`text-sm mb-2 line-clamp-2 ${
                   currentConversation?.guid === thread.guid ? 'text-blue-100' : 'text-gray-400'
                 }`}>
-                  {thread.lastMessage.content}
+                  {thread.lastMessage?.content || 'No messages yet'}
                 </p>
 
                 {/* Footer - Tags & Assignment */}
                 <div className="flex items-center justify-between">
-                  <div className="flex space-x-1 flex-wrap">
-                    {thread.tags.slice(0, 2).map((tag, index) => (
+                  <div className="flex space-x-1 flex-wrap gap-1">
+                    {thread.tags?.slice(0, 2).map((tag: any, index: number) => (
                       <span
                         key={index}
                         className="px-2 py-1 rounded text-xs font-medium"
                         style={{ 
-                          backgroundColor: `${tag.color}20`,
-                          color: tag.color,
-                          border: `1px solid ${tag.color}40`
+                          backgroundColor: `${tag.color || '#9CA3AF'}20`,
+                          color: tag.color || '#9CA3AF',
+                          border: `1px solid ${tag.color || '#9CA3AF'}40`
                         }}
                       >
                         {tag.label}
                       </span>
                     ))}
-                    {thread.tags.length > 2 && (
+                    {thread.tags?.length > 2 && (
                       <span className="px-2 py-1 rounded text-xs bg-gray-600 text-gray-300">
                         +{thread.tags.length - 2}
                       </span>
@@ -349,7 +219,7 @@ export default function ConversationList({
                   {thread.assignedTo && (
                     <div className="flex items-center space-x-1">
                       <div className="w-6 h-6 bg-[#536dfe] rounded-full flex items-center justify-center text-xs text-white">
-                        {thread.assignedTo.firstname[0]}{thread.assignedTo.lastname[0]}
+                        {thread.assignedTo.firstname?.[0] || 'A'}{thread.assignedTo.lastname?.[0] || 'G'}
                       </div>
                     </div>
                   )}
