@@ -139,7 +139,7 @@ const loginToChatbot24 = async (email: string, password: string): Promise<Chatbo
 const loginToLocalAPI = async (email: string, password: string): Promise<LocalLoginResponse> => {
   console.log("Sending local login request...");
   
-  const response = await fetch("http://localhost:5000/api/auth/login", {
+  const response = await fetch("https://chatbotwebbackend-production.up.railway.app/api/auth/login", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
