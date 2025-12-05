@@ -10,18 +10,12 @@ type LoginFormData = {
 };
 
 type ChatbotLoginResponse = {
-  tfa_required: boolean;
-  accessToken: string;
-  guid: string;
-  role: string;
-  domains: string[];
-  loginToken: string;
-  is_agency: number;
-  client_limit: number;
-  widgetUID: string;
-  defaultWorkspace: any;
-  workspaces: any[];
-  tariff: string;
+  success: boolean;
+  sessionId?: string;
+  accessToken?: string;
+  email?: string;
+  message?: string;
+  error?: string;
 };
 
 type LocalLoginResponse = {
@@ -85,69 +79,72 @@ const getTimezone = () => {
   }
 };
 
-// Function to login to chatbot24.ai
-const loginToChatbot24 = async (email: string, password: string): Promise<ChatbotLoginResponse> => {
-  const deviceInfo = getDeviceInfo();
-  const timezone = getTimezone();
+// Function to login to chatbot24.ai via backend proxy (FIXED VERSION)
+const loginToChatbot24ViaProxy = async (email: string, password: string): Promise<ChatbotLoginResponse> => {
+  console.log("🔑 Logging into chatbot24.ai via backend proxy...");
 
-  const payload = {
-    device: {
-      type: deviceInfo.type,
-      appVersion: deviceInfo.appVersion,
-      language: deviceInfo.language,
-      platform: deviceInfo.platform,
-      userAgent: deviceInfo.userAgent,
-      deviceID: deviceInfo.deviceID
-    },
-    password: password,
-    timezone: timezone,
-    username: email
-  };
+  try {
+    const response = await fetch("http://localhost:5000/api/proxy/chatbot/login-full", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: email,
+        password: password
+      }),
+      credentials: 'include', // Important for cookies
+    });
 
-  console.log("Sending chatbot login request...");
+    // Check response status first
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Proxy login failed:", errorText);
 
-  const response = await fetch("https://api.chatbot24.ai/v1/auth/login", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
+      let errorMessage = `Proxy login failed with status: ${response.status}`;
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("Chatbot login failed:", errorText);
-    let errorMessage = `Chatbot login failed with status: ${response.status}`;
-    
-    try {
-      const errorData = JSON.parse(errorText);
-      errorMessage = errorData.message || errorData.error || errorMessage;
-    } catch {
-      // If response is not JSON, use the text
-      errorMessage = errorText || errorMessage;
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.error || errorData.message || errorMessage;
+      } catch {
+        errorMessage = errorText || errorMessage;
+      }
+
+      throw new Error(errorMessage);
     }
-    
-    throw new Error(errorMessage);
-  }
 
-  const data = await response.json();
-  console.log("Chatbot24.ai login successful!");
-  return data;
+    const chatbotData = await response.json();
+
+    if (!chatbotData.success || !chatbotData.accessToken) {
+      throw new Error(chatbotData.error || "Chatbot login failed");
+    }
+
+    console.log("✅ Chatbot login successful!");
+    console.log("Session ID:", chatbotData.sessionId);
+
+    // Store the session ID
+    localStorage.setItem("chatbotSessionId", chatbotData.sessionId);
+
+    return chatbotData;
+  } catch (error: any) {
+    console.error("Chatbot proxy login error:", error);
+    throw error;
+  }
 };
 
 // Function to login to local API
-const loginToLocalAPI = async (email: string, password: string): Promise<LocalLoginResponse> => {
-  console.log("Sending local login request...");
-  
-  const response = await fetch("https://chatbotwebbackend-production.up.railway.app/api/auth/login", {
+const loginToLocalAPI = async (email: string, password: string, chatbotData?: any): Promise<LocalLoginResponse> => {
+  console.log("🏠 Logging into local system...");
+
+  const response = await fetch("http://localhost:5000/api/auth/login", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
       email: email,
-      password: password
-      // Note: We're NOT sending chatbotData to local API
+      password: password,
+      chatbotData: chatbotData // Send chatbot data if needed
     }),
   });
 
@@ -156,14 +153,14 @@ const loginToLocalAPI = async (email: string, password: string): Promise<LocalLo
 
   if (!response.ok) {
     let errorMessage = `Local login failed with status: ${response.status}`;
-    
+
     try {
       const errorData = JSON.parse(responseText);
       errorMessage = errorData.error || errorData.message || errorMessage;
     } catch {
       errorMessage = responseText || errorMessage;
     }
-    
+
     throw new Error(errorMessage);
   }
 
@@ -176,112 +173,113 @@ const loginToLocalAPI = async (email: string, password: string): Promise<LocalLo
   }
 };
 
-// Function to establish WebSocket connection using chatbot24.ai token
-const connectWebSocket = (chatbotToken: string, guid: string) => {
-  if (typeof window === 'undefined') return null;
-
+// Function to check chatbot session
+const checkChatbotSession = async (sessionId: string): Promise<boolean> => {
   try {
-    // Use chatbot24.ai token for WebSocket connection
-    // Trying both accessToken and loginToken to see which one works
-    const wsUrl = `wss://api.chatbot24.ai/chat/?token=${chatbotToken}`;
-    console.log("Connecting WebSocket to:", wsUrl);
-    
-    const ws = new WebSocket(wsUrl);
-    
-    ws.onopen = () => {
-      console.log('✅ WebSocket connection established with chatbot24.ai');
-      localStorage.setItem('websocketConnected', 'true');
-      localStorage.setItem('websocketToken', chatbotToken);
-      
-      // Store WebSocket instance globally
-      (window as any).chatbotWebSocket = ws;
-      
-      // Send initial message with user info
-      setTimeout(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-          const initMessage = {
-            type: 'init',
-            token: chatbotToken,
-            guid: guid,
-            timestamp: Date.now(),
-            action: 'user_connected'
-          };
-          ws.send(JSON.stringify(initMessage));
-          console.log('Sent WebSocket init message');
-        }
-      }, 1000);
-    };
+    const response = await fetch(`http://localhost:5000/api/proxy/chatbot/session`, {
+      method: "GET",
+      headers: {
+        "X-Chatbot-Session-Id": sessionId,
+      },
+    });
 
-    ws.onclose = (event) => {
-      console.log('WebSocket connection closed. Code:', event.code, 'Reason:', event.reason);
-      localStorage.removeItem('websocketConnected');
-      localStorage.removeItem('websocketToken');
-      (window as any).chatbotWebSocket = null;
-      
-      // Attempt reconnection if not clean close
-      if (!event.wasClean && event.code !== 1000) {
-        console.log('Attempting to reconnect WebSocket in 3 seconds...');
-        setTimeout(() => {
-          const storedToken = localStorage.getItem('chatbotLoginToken') || 
-                            localStorage.getItem('chatbotAccessToken');
-          const storedGuid = localStorage.getItem('chatbotGuid');
-          if (storedToken && storedGuid) {
-            connectWebSocket(storedToken, storedGuid);
-          }
-        }, 3000);
-      }
-    };
-
-    ws.onerror = (error: Event) => {
-      console.error('WebSocket error:', error);
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        console.log('📨 WebSocket message received:', data);
-        
-        // Handle welcome/connection confirmation
-        if (data.type === 'welcome' || data.event === 'connected' || data.status === 'connected') {
-          console.log('✅ WebSocket connection confirmed by server');
-        }
-        
-        // Handle chat messages
-        if (data.type === 'message' || data.message) {
-          console.log('💬 Chat message:', data);
-        }
-        
-        // You can add more message handlers here based on your needs
-        
-      } catch (e) {
-        console.log('📨 Raw WebSocket message:', event.data);
-      }
-    };
-
-    return ws;
+    const data = await response.json();
+    return data.authenticated === true;
   } catch (error) {
-    console.error('❌ Failed to create WebSocket:', error);
-    return null;
+    console.error("Session check failed:", error);
+    return false;
   }
 };
 
-// Function to send message through WebSocket
-export const sendWebSocketMessage = (message: any) => {
-  if (typeof window !== 'undefined' && (window as any).chatbotWebSocket) {
-    const ws = (window as any).chatbotWebSocket;
-    if (ws.readyState === WebSocket.OPEN) {
-      const messageString = typeof message === 'string' ? message : JSON.stringify(message);
-      ws.send(messageString);
-      console.log('📤 Message sent via WebSocket:', message);
-      return true;
-    } else {
-      console.warn('⚠️ WebSocket is not connected. State:', ws.readyState);
-      return false;
-    }
-  } else {
-    console.warn('⚠️ WebSocket is not initialized');
-    return false;
-  }
+// Function to establish WebSocket connection using chatbot24.ai token
+// const connectWebSocket = (chatbotToken: string, guid: string) => {
+//   if (typeof window === 'undefined') return null;
+
+//   try {
+//     const wsUrl = `wss://api.chatbot24.ai/chat/?token=${chatbotToken}`;
+//     console.log("Connecting WebSocket to:", wsUrl);
+
+//     const ws = new WebSocket(wsUrl);
+
+//     ws.onopen = () => {
+//       console.log('✅ WebSocket connection established with chatbot24.ai');
+//       localStorage.setItem('websocketConnected', 'true');
+//       localStorage.setItem('websocketToken', chatbotToken);
+
+//       // Store WebSocket instance globally
+//       (window as any).chatbotWebSocket = ws;
+
+//       // Send initial message with user info
+//       setTimeout(() => {
+//         if (ws.readyState === WebSocket.OPEN) {
+//           const initMessage = {
+//             type: 'init',
+//             token: chatbotToken,
+//             guid: guid,
+//             timestamp: Date.now(),
+//             action: 'user_connected'
+//           };
+//           ws.send(JSON.stringify(initMessage));
+//           console.log('Sent WebSocket init message');
+//         }
+//       }, 1000);
+//     };
+
+//     ws.onclose = (event) => {
+//       console.log('WebSocket connection closed. Code:', event.code, 'Reason:', event.reason);
+//       localStorage.removeItem('websocketConnected');
+//       localStorage.removeItem('websocketToken');
+//       (window as any).chatbotWebSocket = null;
+//     };
+
+//     ws.onerror = (error: Event) => {
+//       console.error('WebSocket error:', error);
+//     };
+
+//     ws.onmessage = (event) => {
+//       try {
+//         const data = JSON.parse(event.data);
+//         console.log('📨 WebSocket message received:', data);
+
+//         if (data.type === 'welcome' || data.event === 'connected' || data.status === 'connected') {
+//           console.log('✅ WebSocket connection confirmed by server');
+//         }
+
+//         if (data.type === 'message' || data.message) {
+//           console.log('💬 Chat message:', data);
+//         }
+
+//       } catch (e) {
+//         console.log('📨 Raw WebSocket message:', event.data);
+//       }
+//     };
+
+//     return ws;
+//   } catch (error) {
+//     console.error('❌ Failed to create WebSocket:', error);
+//     return null;
+//   }
+// };
+
+// Function to open chatbot dashboard in new tab
+// const openChatbotDashboard = (email: string, password: string) => {
+//   const encodedEmail = encodeURIComponent(email);
+//   const encodedPassword = encodeURIComponent(password);
+
+//   // Open dashboard using backend proxy
+//   const dashboardUrl = `http://localhost:5000/api/proxy/chatbot/direct-login?email=${encodedEmail}&password=${encodedPassword}`;
+
+//   window.open(dashboardUrl, '_blank');
+// };
+
+// Function to open login and redirect page
+const openChatbotLoginRedirect = (email: string, password: string) => {
+  const encodedEmail = encodeURIComponent(email);
+  const encodedPassword = encodeURIComponent(password);
+
+  const loginUrl = `http://localhost:5000/api/proxy/chatbot/login-and-redirect?email=${encodedEmail}&password=${encodedPassword}`;
+
+  window.open(loginUrl, '_blank');
 };
 
 export default function LoginPage() {
@@ -320,28 +318,32 @@ export default function LoginPage() {
     setError("");
 
     try {
-      console.log("🔑 Step 1: Logging into chatbot24.ai...");
-      
-      // Step 1: Login to chatbot24.ai
-      const chatbotData = await loginToChatbot24(formData.email, formData.password);
-      
-      console.log("✅ Chatbot24.ai login successful!");
-      console.log("Access Token:", chatbotData.accessToken.substring(0, 30) + "...");
-      console.log("Login Token:", chatbotData.loginToken.substring(0, 30) + "...");
-      console.log("GUID:", chatbotData.guid);
+      console.log("🔑 Step 1: Logging into chatbot24.ai via proxy...");
 
-      // Store chatbot data
-      localStorage.setItem("chatbotAccessToken", chatbotData.accessToken);
-      localStorage.setItem("chatbotLoginToken", chatbotData.loginToken);
-      localStorage.setItem("chatbotGuid", chatbotData.guid);
-      localStorage.setItem("chatbotRole", chatbotData.role);
-      localStorage.setItem("chatbotWorkspace", JSON.stringify(chatbotData.defaultWorkspace));
+      // Step 1: Login to chatbot24.ai via backend proxy
+      const chatbotData = await loginToChatbot24ViaProxy(formData.email, formData.password);
+
+      if (!chatbotData.success || !chatbotData.accessToken) {
+        throw new Error(chatbotData.error || "Chatbot login failed");
+      }
+
+      console.log("✅ Chatbot24.ai proxy login successful!");
+      console.log("Session ID:", chatbotData.sessionId);
+      console.log("Access Token:", chatbotData.accessToken.substring(0, 30) + "...");
+
+      // Store chatbot session data
+      if (chatbotData.sessionId) {
+        localStorage.setItem("chatbotSessionId", chatbotData.sessionId);
+      }
+      if (chatbotData.accessToken) {
+        localStorage.setItem("chatbotAccessToken", chatbotData.accessToken);
+      }
 
       console.log("🏠 Step 2: Logging into local system...");
-      
+
       // Step 2: Login to local system
-      const localData = await loginToLocalAPI(formData.email, formData.password);
-      
+      const localData = await loginToLocalAPI(formData.email, formData.password, chatbotData);
+
       console.log("✅ Local login response received");
 
       // Handle local login response
@@ -350,8 +352,7 @@ export default function LoginPage() {
 
       if (!authToken) {
         console.warn("⚠️ No token from local API, but continuing with chatbot login...");
-        // We can continue even without local token since chatbot login succeeded
-        authToken = chatbotData.accessToken; // Fallback to chatbot token
+        authToken = chatbotData.accessToken || "chatbot-fallback-token";
       }
 
       // Store credentials
@@ -361,35 +362,20 @@ export default function LoginPage() {
         email: userData.email || formData.email,
         name: userData.name || formData.email.split('@')[0],
         role: userData.role || "user",
-        chatbotGuid: chatbotData.guid,
-        chatbotRole: chatbotData.role
+        chatbotSessionId: chatbotData.sessionId,
+        chatbotEmail: formData.email
       }));
       localStorage.setItem("externalUserEmail", formData.email);
-      localStorage.setItem("externalUserPassword", formData.password);
 
-      console.log("🔌 Step 3: Establishing WebSocket connection with chatbot24.ai token...");
-      
+      console.log("🔌 Step 3: Establishing WebSocket connection...");
+
       // Step 3: Establish WebSocket connection using chatbot24.ai token
-      // First try with loginToken (seems to be for WebSocket based on expiration time)
-      // If that fails, try with accessToken
-      let ws = null;
-      let wsTokenToUse = chatbotData.loginToken; // Start with loginToken
-      
-      console.log("Trying WebSocket with loginToken...");
-      ws = connectWebSocket(chatbotData.loginToken, chatbotData.guid);
-      
-      if (!ws) {
-        console.log("Trying WebSocket with accessToken...");
-        ws = connectWebSocket(chatbotData.accessToken, chatbotData.guid);
-      }
-      
-      if (ws) {
-        console.log("✅ WebSocket connection initiated");
-        // Store which token worked
-        localStorage.setItem('websocketTokenUsed', wsTokenToUse === chatbotData.loginToken ? 'loginToken' : 'accessToken');
-      } else {
-        console.warn("⚠️ WebSocket connection failed, but login was successful");
-      }
+      // if (chatbotData.accessToken) {
+      //   const ws = connectWebSocket(chatbotData.accessToken, chatbotData.sessionId || '');
+      //   if (ws) {
+      //     console.log("✅ WebSocket connection initiated");
+      //   }
+      // }
 
       // Store remember me preference
       if (formData.rememberMe) {
@@ -408,11 +394,11 @@ export default function LoginPage() {
 
     } catch (err: any) {
       console.error("❌ Login error:", err);
-      
+
       let errorMessage = err.message || "Login failed. Please try again.";
-      
+
       // Provide user-friendly error messages
-      if (errorMessage.includes("Chatbot login failed")) {
+      if (errorMessage.includes("Chatbot login failed") || errorMessage.includes("proxy")) {
         if (errorMessage.includes("401") || errorMessage.includes("Unauthorized")) {
           errorMessage = "Invalid email or password for chatbot service";
         } else if (errorMessage.includes("Network")) {
@@ -420,16 +406,31 @@ export default function LoginPage() {
         }
       } else if (errorMessage.includes("Local login failed")) {
         errorMessage = "Local authentication failed. Using chatbot service only.";
-        // We can still continue if chatbot login succeeded
       }
-      
+
       setError(errorMessage);
-      
-      // Partial cleanup - keep chatbot data if that succeeded
+
+      // Cleanup on error
       localStorage.removeItem("authToken");
       localStorage.removeItem("userData");
+      localStorage.removeItem("chatbotSessionId");
+      localStorage.removeItem("chatbotAccessToken");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleOpenChatbotDashboard = () => {
+    if (!formData.email || !formData.password) {
+      setError("Please enter email and password first");
+      return;
+    }
+
+    try {
+      openChatbotLoginRedirect(formData.email, formData.password);
+    } catch (error) {
+      console.error("Failed to open chatbot dashboard:", error);
+      setError("Failed to open chatbot dashboard. Please try again.");
     }
   };
 
@@ -442,7 +443,7 @@ export default function LoginPage() {
     if (typeof window !== 'undefined') {
       const rememberMe = localStorage.getItem("rememberMe");
       const savedEmail = localStorage.getItem("savedEmail");
-      
+
       if (rememberMe === "true" && savedEmail) {
         setFormData(prev => ({
           ...prev,
@@ -468,7 +469,7 @@ export default function LoginPage() {
             </div>
             <p className="text-gray-400 text-sm">Intelligent Image Enhancement</p>
           </div>
-          
+
           <div className="mb-8">
             <h2 className="text-4xl font-bold text-white mb-3">Welcome Back!</h2>
             <p className="text-[#94A3B8] text-lg">
@@ -601,6 +602,17 @@ export default function LoginPage() {
                   Sign In
                 </span>
               )}
+            </button>
+
+            {/* Additional button to open chatbot dashboard */}
+            <button
+              onClick={handleOpenChatbotDashboard}
+              disabled={isLoading || !formData.email || !formData.password}
+              className="w-full bg-gradient-to-r from-[#10B981] to-[#059669] text-white py-4 rounded-xl font-bold cursor-pointer transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-green-500/25 flex items-center justify-center group"
+            >
+              <span className="group-hover:scale-105 transition-transform duration-200">
+                Open Chatbot Dashboard
+              </span>
             </button>
 
             {/* Register Link */}
