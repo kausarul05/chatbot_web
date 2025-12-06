@@ -273,14 +273,14 @@ const checkChatbotSession = async (sessionId: string): Promise<boolean> => {
 // };
 
 // Function to open login and redirect page
-const openChatbotLoginRedirect = (email: string, password: string) => {
-  const encodedEmail = encodeURIComponent(email);
-  const encodedPassword = encodeURIComponent(password);
+// const openChatbotLoginRedirect = (email: string, password: string) => {
+//   const encodedEmail = encodeURIComponent(email);
+//   const encodedPassword = encodeURIComponent(password);
 
-  const loginUrl = `http://localhost:5000/api/proxy/chatbot/login-and-redirect?email=${encodedEmail}&password=${encodedPassword}`;
+//   const loginUrl = `http://localhost:5000/api/proxy/chatbot/login-and-redirect?email=${encodedEmail}&password=${encodedPassword}`;
 
-  window.open(loginUrl, '_blank');
-};
+//   window.open(loginUrl, '_blank');
+// };
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -420,19 +420,19 @@ export default function LoginPage() {
     }
   };
 
-  const handleOpenChatbotDashboard = () => {
-    if (!formData.email || !formData.password) {
-      setError("Please enter email and password first");
-      return;
-    }
+  // const handleOpenChatbotDashboard = () => {
+  //   if (!formData.email || !formData.password) {
+  //     setError("Please enter email and password first");
+  //     return;
+  //   }
 
-    try {
-      openChatbotLoginRedirect(formData.email, formData.password);
-    } catch (error) {
-      console.error("Failed to open chatbot dashboard:", error);
-      setError("Failed to open chatbot dashboard. Please try again.");
-    }
-  };
+  //   try {
+  //     openChatbotLoginRedirect(formData.email, formData.password);
+  //   } catch (error) {
+  //     console.error("Failed to open chatbot dashboard:", error);
+  //     setError("Failed to open chatbot dashboard. Please try again.");
+  //   }
+  // };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !isLoading) handleLogin();
@@ -605,7 +605,7 @@ export default function LoginPage() {
             </button>
 
             {/* Additional button to open chatbot dashboard */}
-            <button
+            {/* <button
               onClick={handleOpenChatbotDashboard}
               disabled={isLoading || !formData.email || !formData.password}
               className="w-full bg-gradient-to-r from-[#10B981] to-[#059669] text-white py-4 rounded-xl font-bold cursor-pointer transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-green-500/25 flex items-center justify-center group"
@@ -613,7 +613,7 @@ export default function LoginPage() {
               <span className="group-hover:scale-105 transition-transform duration-200">
                 Open Chatbot Dashboard
               </span>
-            </button>
+            </button> */}
 
             {/* Register Link */}
             <div className="text-center pt-4">
