@@ -22,9 +22,9 @@ export default function DashboardPage() {
     setIsLoading(false);
   }, [router]);
 
-  const openInNewTab = () => {
-    window.open('https://dashboard.chatbot24.ai/app', '_blank');
-  };
+  // const openInNewTab = () => {
+  //   window.open('https://dashboard.chatbot24.ai/app', '_blank');
+  // };
 
   if (isLoading) {
     return (
@@ -52,12 +52,12 @@ export default function DashboardPage() {
           >
             Refresh
           </button>
-          <button
+          {/* <button
             onClick={openInNewTab}
             className="bg-[#60A5FB] text-white px-4 py-2 rounded-lg hover:bg-[#3B82F6] transition-colors"
           >
             Open in New Tab
-          </button>
+          </button> */}
           <button
             onClick={() => {
               localStorage.clear();
