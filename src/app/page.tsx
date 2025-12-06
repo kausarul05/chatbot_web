@@ -84,7 +84,7 @@ const loginToChatbot24ViaProxy = async (email: string, password: string): Promis
   console.log("🔑 Logging into chatbot24.ai via backend proxy...");
 
   try {
-    const response = await fetch("chatbotwebbackend-production.up.railway.app/api/proxy/chatbot/login-full", {
+    const response = await fetch("https://chatbotwebbackend-production.up.railway.app/api/proxy/chatbot/login-full", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -136,7 +136,7 @@ const loginToChatbot24ViaProxy = async (email: string, password: string): Promis
 const loginToLocalAPI = async (email: string, password: string, chatbotData?: any): Promise<LocalLoginResponse> => {
   console.log("🏠 Logging into local system...");
 
-  const response = await fetch("chatbotwebbackend-production.up.railway.app/api/auth/login", {
+  const response = await fetch("https://chatbotwebbackend-production.up.railway.app/api/auth/login", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -176,7 +176,7 @@ const loginToLocalAPI = async (email: string, password: string, chatbotData?: an
 // Function to check chatbot session
 const checkChatbotSession = async (sessionId: string): Promise<boolean> => {
   try {
-    const response = await fetch(`chatbotwebbackend-production.up.railway.app/api/proxy/chatbot/session`, {
+    const response = await fetch(`https://chatbotwebbackend-production.up.railway.app/api/proxy/chatbot/session`, {
       method: "GET",
       headers: {
         "X-Chatbot-Session-Id": sessionId,
@@ -267,7 +267,7 @@ const checkChatbotSession = async (sessionId: string): Promise<boolean> => {
 //   const encodedPassword = encodeURIComponent(password);
 
 //   // Open dashboard using backend proxy
-//   const dashboardUrl = `chatbotwebbackend-production.up.railway.app/api/proxy/chatbot/direct-login?email=${encodedEmail}&password=${encodedPassword}`;
+//   const dashboardUrl = `https://chatbotwebbackend-production.up.railway.app/api/proxy/chatbot/direct-login?email=${encodedEmail}&password=${encodedPassword}`;
 
 //   window.open(dashboardUrl, '_blank');
 // };
@@ -277,7 +277,7 @@ const checkChatbotSession = async (sessionId: string): Promise<boolean> => {
 //   const encodedEmail = encodeURIComponent(email);
 //   const encodedPassword = encodeURIComponent(password);
 
-//   const loginUrl = `chatbotwebbackend-production.up.railway.app/api/proxy/chatbot/login-and-redirect?email=${encodedEmail}&password=${encodedPassword}`;
+//   const loginUrl = `https://chatbotwebbackend-production.up.railway.app/api/proxy/chatbot/login-and-redirect?email=${encodedEmail}&password=${encodedPassword}`;
 
 //   window.open(loginUrl, '_blank');
 // };

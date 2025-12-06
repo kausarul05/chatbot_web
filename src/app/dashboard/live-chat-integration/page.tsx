@@ -73,7 +73,7 @@ export default function DashboardPage() {
       {/* Dashboard Iframe */}
       <div className="flex-1">
         <iframe
-          src={`chatbotwebbackend-production.up.railway.app/api/proxy/chatbot/embed-dashboard?sessionId=${sessionId}`}
+          src={`https://chatbotwebbackend-production.up.railway.app/api/proxy/chatbot/embed-dashboard?sessionId=${sessionId}`}
           className="w-full h-full border-0"
           title="Chatbot24.ai Dashboard"
           sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
